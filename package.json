@@ -1,0 +1,15 @@
+{
+  "name": "papercode-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Camera-assisted handwritten arithmetic for children",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check dist/assets/core.js && node --check dist/assets/app.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

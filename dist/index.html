@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="PaperCode Lab biến phép tính viết tay thành kết quả tức thì ngay trên trình duyệt." />
+    <meta name="theme-color" content="#173fc2" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' blob: data: https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" />
+    <title>PaperCode Lab — Viết trên giấy, thấy kết quả</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23173fc2'/%3E%3Cpath d='M17 13h24l8 8v30H17z' fill='white'/%3E%3Cpath d='M41 13v10h10' fill='none' stroke='%23ff5a4f' stroke-width='5'/%3E%3Cpath d='M24 32h18M24 40h12' stroke='%23173fc2' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./assets/styles.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script type="module" src="./assets/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">Bỏ qua đến vùng làm việc</a>
+    <header class="topbar">
+      <a class="brand" href="#workspace" aria-label="PaperCode Lab, về vùng làm việc"><span class="brand-mark" aria-hidden="true">P/</span><span>PaperCode <b>Lab</b></span></a>
+      <div class="privacy-pill" title="Ảnh chỉ được xử lý trong trình duyệt"><span aria-hidden="true">●</span> Xử lý tại thiết bị</div>
+    </header>
+    <main id="workspace" class="page-shell">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">PHÒNG THÍ NGHIỆM GIẤY × MÃ</p>
+          <h1 id="page-title">Viết trên giấy.<br /><em>Thấy kết quả.</em></h1>
+        </div>
+        <div class="syntax-card">
+          <p>Viết rõ, mỗi dòng một lệnh:</p>
+          <code>x = 5<br />y = 10<br />z = 7<br />x + y * z</code>
+          <button id="sample-button" class="text-button" type="button">Dùng mẫu này →</button>
+        </div>
+      </section>
+      <section class="scanner" aria-label="Máy quét PaperCode">
+        <div class="scanner-head">
+          <div><span class="step-label">01 / ĐẶT GIẤY VÀO KHUNG</span><span id="camera-status" class="status-text" role="status">Camera chưa bật</span></div>
+          <button id="camera-button" class="secondary-button" type="button">Bật camera</button>
+        </div>
+        <div class="stage-grid">
+          <div class="camera-panel">
+            <video id="camera" playsinline muted aria-label="Hình ảnh trực tiếp từ camera"></video>
+            <canvas id="capture-canvas" hidden></canvas>
+            <div id="camera-placeholder" class="camera-placeholder"><span class="camera-glyph" aria-hidden="true">⌑</span><strong>Đưa tờ giấy vào đây</strong><span>Ánh sáng đều · chữ đậm · máy song song với giấy</span></div>
+            <div class="scan-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            <div class="camera-actions">
+              <label class="file-button" for="image-input">Chọn ảnh</label>
+              <input id="image-input" type="file" accept="image/*" capture="environment" />
+              <button id="scan-button" class="capture-button" type="button" disabled><span aria-hidden="true"></span> Quét &amp; chạy</button>
+            </div>
+          </div>
+          <div class="result-panel" aria-labelledby="result-title">
+            <div class="result-heading">
+              <div><span class="step-label">02 / KẾT QUẢ</span><h2 id="result-title">Mã máy đọc được</h2></div>
+              <span id="confidence-badge" class="confidence-badge" hidden></span>
+            </div>
+            <label class="sr-only" for="code-input">Mã nhận dạng được, có thể sửa</label>
+            <textarea id="code-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="code-help"></textarea>
+            <p id="code-help" class="field-help">Kiểm tra lại chữ máy đọc trước khi chạy.</p>
+            <div id="line-results" class="line-results" aria-live="polite"></div>
+            <div class="result-actions"><button id="run-button" class="primary-button" type="button">Chạy mã</button><button id="clear-button" class="ghost-button" type="button">Làm lại</button></div>
+            <div id="progress-wrap" class="progress-wrap" hidden>
+              <div class="progress-copy"><span id="progress-label">Đang chuẩn bị nhận dạng…</span><span id="progress-value">0%</span></div>
+              <div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="guide-grid" aria-label="Hướng dẫn và giới hạn">
+        <article><span class="index">A</span><h2>Cú pháp phiên bản 1</h2><p>Tên biến, số, dấu ngoặc và các phép <code>+ − × ÷ ^</code>. Dùng dấu chấm cho số thập phân.</p></article>
+        <article><span class="index">B</span><h2>Khi máy đọc sai</h2><p>Sửa trực tiếp ở ô mã rồi chạy lại. PaperCode không âm thầm đoán hoặc sửa ý của bạn.</p></article>
+        <article><span class="index">C</span><h2>Quyền riêng tư</h2><p>Ảnh và mã không được gửi về máy chủ của PaperCode. Bạn có thể tắt camera bất cứ lúc nào.</p></article>
+      </section>
+      <details class="research-note"><summary>Vì sao sản phẩm bắt đầu bằng một ngôn ngữ nhỏ?</summary><p>Chữ viết tay của trẻ và ký hiệu lập trình là bài toán khó. Phiên bản này ưu tiên vòng lặp “viết → nhìn lại → sửa → chạy”, giới hạn cú pháp để lỗi dễ nhận biết và đo lường được.</p></details>
+    </main>
+    <footer><span>PaperCode Lab v1.0</span><span>Thử nghiệm giáo dục · Không thu thập dữ liệu</span></footer>
+    <div id="toast" class="toast" role="alert" hidden></div>
+  </body>
+</html>

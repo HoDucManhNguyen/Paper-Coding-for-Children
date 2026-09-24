@@ -1,0 +1,45 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { evaluateExpression, normalizeSource, runProgram } from "../dist/assets/core.js";
+
+test("runs the product example with standard precedence", () => {
+  const program = runProgram("x = 5\ny = 10\nz = 7\nx+y*z");
+  assert.equal(program.ok, true);
+  assert.equal(program.lines.at(-1).value, 75);
+});
+
+test("supports parentheses, decimals, unary operators, and powers", () => {
+  assert.equal(evaluateExpression("-(2 + 3) * 4"), -20);
+  assert.equal(evaluateExpression("2^3^2"), 512);
+  assert.equal(evaluateExpression(".5 + 1.25"), 1.75);
+});
+
+test("normalizes handwriting-friendly operator glyphs", () => {
+  assert.equal(normalizeSource("8 × 2 − 6 ÷ 3"), "8 * 2 - 6 / 3");
+  assert.equal(evaluateExpression(normalizeSource("8 × 2 − 6 ÷ 3")), 14);
+});
+
+test("reports unknown variables without stopping later line reporting", () => {
+  const program = runProgram("a + 2\nb = 3");
+  assert.equal(program.ok, false);
+  assert.match(program.lines[0].error, /chưa có giá trị/);
+  assert.equal(program.lines[1].value, 3);
+});
+
+test("rejects unsupported syntax and division by zero", () => {
+  assert.throws(() => evaluateExpression("2 % 1"), /chưa được hỗ trợ/);
+  assert.throws(() => evaluateExpression("4 / 0"), /chia cho 0/);
+});
+
+test("never executes JavaScript", () => {
+  const program = runProgram("globalThis.hacked = 1");
+  assert.equal(program.ok, false);
+  assert.equal(globalThis.hacked, undefined);
+});
+
+test("accepts comments and skips blank lines", () => {
+  const program = runProgram("x = 4 # store four\n\n x * 3");
+  assert.equal(program.ok, true);
+  assert.equal(program.lines.length, 2);
+  assert.equal(program.lines[1].value, 12);
+});
