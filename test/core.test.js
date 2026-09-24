@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { evaluateExpression, normalizeSource, runProgram } from "../dist/assets/core.js";
+import { assessOcrText, evaluateExpression, normalizeSource, runProgram } from "../dist/assets/core.js";
 
 test("runs the product example with standard precedence", () => {
   const program = runProgram("x = 5\ny = 10\nz = 7\nx+y*z");
@@ -42,4 +42,10 @@ test("accepts comments and skips blank lines", () => {
   assert.equal(program.ok, true);
   assert.equal(program.lines.length, 2);
   assert.equal(program.lines[1].value, 12);
+});
+
+test("rejects low-quality OCR output before it overwrites visible code", () => {
+  assert.equal(assessOcrText("x = 5\ny = 10\nx + y", 82).ok, true);
+  assert.equal(assessOcrText("@ @@ | | noisy text", 20).ok, false);
+  assert.equal(assessOcrText(Array(20).fill("x = 1").join("\n"), 90).ok, false);
 });

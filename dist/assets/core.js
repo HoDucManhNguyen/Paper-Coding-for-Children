@@ -125,6 +125,20 @@ export function formatNumber(value) {
   return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 10 }).format(value);
 }
 
+export function assessOcrText(text, confidence) {
+  const source = String(text || "").trim();
+  const lines = source.split("\n").filter((line) => line.trim());
+  const compact = source.replace(/\s/g, "");
+  const supported = compact.replace(/[^A-Za-z0-9_+\-*/^()=.#]/g, "");
+  const supportedRatio = compact.length ? supported.length / compact.length : 0;
+  const reasons = [];
+  if (!source) reasons.push("blank");
+  if (Number(confidence) < 35) reasons.push("low-confidence");
+  if (lines.length > 12) reasons.push("too-many-lines");
+  if (supportedRatio < 0.9) reasons.push("unsupported-characters");
+  return { ok: reasons.length === 0, reasons, lineCount: lines.length, supportedRatio };
+}
+
 export function runProgram(source) {
   const normalized = normalizeSource(source);
   if (normalized.length > MAX_SOURCE_LENGTH) throw new PaperCodeError("Bài viết quá dài");

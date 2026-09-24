@@ -89,6 +89,8 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus
 .progress-copy { display: flex; justify-content: space-between; color: var(--muted); font-size: .78rem; margin-bottom: 7px; }
 .progress-track { height: 6px; background: #dfe5f7; border-radius: 999px; overflow: hidden; }
 .progress-track span { display: block; height: 100%; width: 0; background: var(--aqua); transition: width .2s ease; }
+.cancel-button { margin-top: 10px; padding: 5px 0; border: 0; color: var(--danger); background: transparent; font-size: .8rem; font-weight: 800; cursor: pointer; }
+.cancel-button:hover { text-decoration: underline; }
 .guide-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 32px; background: var(--line); border: 1px solid var(--line); }
 .guide-grid article { position: relative; background: var(--paper); padding: 28px 30px 28px 66px; }
 .guide-grid .index { position: absolute; left: 24px; top: 29px; color: var(--coral); font-weight: 900; }

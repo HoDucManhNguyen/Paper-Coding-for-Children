@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="PaperCode Lab biến phép tính viết tay thành kết quả tức thì ngay trên trình duyệt." />
     <meta name="theme-color" content="#173fc2" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' blob: data: https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' blob: data:; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" />
     <title>PaperCode Lab — Viết trên giấy, thấy kết quả</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23173fc2'/%3E%3Cpath d='M17 13h24l8 8v30H17z' fill='white'/%3E%3Cpath d='M41 13v10h10' fill='none' stroke='%23ff5a4f' stroke-width='5'/%3E%3Cpath d='M24 32h18M24 40h12' stroke='%23173fc2' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./assets/styles.css" />
-    <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script defer src="./vendor/tesseract.min.js"></script>
     <script type="module" src="./assets/app.js"></script>
   </head>
   <body>
@@ -39,7 +39,7 @@
           <div class="camera-panel">
             <video id="camera" playsinline muted aria-label="Hình ảnh trực tiếp từ camera"></video>
             <canvas id="capture-canvas" hidden></canvas>
-            <div id="camera-placeholder" class="camera-placeholder"><span class="camera-glyph" aria-hidden="true">⌑</span><strong>Đưa tờ giấy vào đây</strong><span>Ánh sáng đều · chữ đậm · máy song song với giấy</span></div>
+            <div id="camera-placeholder" class="camera-placeholder"><span class="camera-glyph" aria-hidden="true">⌑</span><strong>Đưa tờ giấy vào đây</strong><span>Giấy trắng · bút mực đậm · máy song song với giấy</span></div>
             <div class="scan-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
             <div class="camera-actions">
               <label class="file-button" for="image-input">Chọn ảnh</label>
@@ -60,6 +60,7 @@
             <div id="progress-wrap" class="progress-wrap" hidden>
               <div class="progress-copy"><span id="progress-label">Đang chuẩn bị nhận dạng…</span><span id="progress-value">0%</span></div>
               <div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div>
+              <button id="cancel-ocr-button" class="cancel-button" type="button">Hủy nhận dạng</button>
             </div>
           </div>
         </div>

@@ -6,10 +6,15 @@
   "description": "Camera-assisted handwritten arithmetic for children",
   "scripts": {
     "test": "node --test",
-    "check": "node --check dist/assets/core.js && node --check dist/assets/app.js"
+    "check": "node --check dist/assets/core.js && node --check dist/assets/app.js",
+    "vendor:sync": "node scripts/copy-ocr-assets.mjs"
   },
   "engines": {
     "node": ">=20"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "tesseract.js": "5.1.1"
+  }
 }

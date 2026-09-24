@@ -1,4 +1,4 @@
-import { runProgram } from "./core.js";
+import { assessOcrText, runProgram } from "./core.js";
 
 const SAMPLE = "x = 5\ny = 10\nz = 7\nx + y * z";
 const $ = (selector) => document.querySelector(selector);
@@ -8,13 +8,27 @@ const elements = {
   codeInput: $("#code-input"), runButton: $("#run-button"), clearButton: $("#clear-button"),
   sampleButton: $("#sample-button"), lineResults: $("#line-results"), cameraStatus: $("#camera-status"),
   confidence: $("#confidence-badge"), progressWrap: $("#progress-wrap"), progressLabel: $("#progress-label"),
-  progressValue: $("#progress-value"), progressBar: $("#progress-bar"), toast: $("#toast"),
+  progressValue: $("#progress-value"), progressBar: $("#progress-bar"), cancelOcrButton: $("#cancel-ocr-button"),
+  toast: $("#toast"),
 };
 
 let mediaStream = null;
 let uploadedImage = null;
 let uploadedImageUrl = null;
 let toastTimer = null;
+let ocrWorker = null;
+let ocrWorkerPromise = null;
+let ocrWorkerGeneration = 0;
+let activeOcrLogger = null;
+let scanSequence = 0;
+let isScanning = false;
+
+const OCR_TIMEOUT_MS = 45_000;
+const OCR_PATHS = {
+  workerPath: new URL("./vendor/worker.min.js", document.baseURI).href,
+  corePath: new URL("./vendor/core/", document.baseURI).href,
+  langPath: new URL("./vendor/lang/", document.baseURI).href,
+};
 
 function showToast(message) {
   clearTimeout(toastTimer);
@@ -34,6 +48,74 @@ function setProgress(progress, label = "Đang nhận dạng chữ viết…") {
 function resetProgress() {
   elements.progressWrap.hidden = true;
   elements.progressBar.style.width = "0%";
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+function reportOcrProgress(message) {
+  const progress = typeof message.progress === "number" ? message.progress : 0;
+  const status = String(message.status || "").toLowerCase();
+  if (status.includes("loading tesseract core")) {
+    setProgress(0.05 + progress * 0.15, "Đang khởi động bộ nhận dạng…");
+  } else if (status.includes("loading language")) {
+    setProgress(0.20 + progress * 0.35, "Đang tải mô hình chữ viết…");
+  } else if (status.includes("initializing")) {
+    setProgress(0.55 + progress * 0.10, "Đang chuẩn bị mô hình…");
+  } else if (status.includes("recognizing")) {
+    setProgress(0.65 + progress * 0.35, "Đang đọc từng dòng…");
+  }
+}
+
+async function resetOcrWorker() {
+  const worker = ocrWorker;
+  ocrWorkerGeneration += 1;
+  ocrWorker = null;
+  ocrWorkerPromise = null;
+  activeOcrLogger = null;
+  if (worker) {
+    try { await worker.terminate(); } catch (_) { /* Worker may already be unavailable. */ }
+  }
+}
+
+async function getOcrWorker() {
+  if (ocrWorker) return ocrWorker;
+  if (!window.Tesseract?.createWorker) throw new Error("Bộ nhận dạng OCR không khởi động được.");
+  if (!ocrWorkerPromise) {
+    const generation = ++ocrWorkerGeneration;
+    const pending = window.Tesseract.createWorker("eng", 1, {
+      ...OCR_PATHS,
+      logger(message) { activeOcrLogger?.(message); },
+    }).then(async (worker) => {
+      if (generation !== ocrWorkerGeneration) {
+        await worker.terminate();
+        throw new Error("Đã hủy khởi động OCR.");
+      }
+      ocrWorker = worker;
+      return worker;
+    });
+    let tracked;
+    tracked = pending.catch((error) => {
+      if (ocrWorkerPromise === tracked) ocrWorkerPromise = null;
+      throw error;
+    });
+    ocrWorkerPromise = tracked;
+  }
+  try {
+    return await withTimeout(
+      ocrWorkerPromise,
+      OCR_TIMEOUT_MS,
+      "OCR mất quá lâu để khởi động. Hãy tải lại trang và thử lại.",
+    );
+  } catch (error) {
+    await resetOcrWorker();
+    throw error;
+  }
 }
 
 function renderResults(program) {
@@ -133,35 +215,62 @@ function drawSourceToCanvas() {
 }
 
 async function recognizeAndRun() {
-  if (!window.Tesseract?.recognize) {
-    showToast("Bộ nhận dạng chưa tải xong. Hãy kiểm tra mạng và thử lại.");
-    return;
-  }
+  if (isScanning) return;
+  const currentScan = ++scanSequence;
+  isScanning = true;
   elements.scanButton.disabled = true;
   elements.runButton.disabled = true;
   elements.confidence.hidden = true;
-  setProgress(0.02, "Đang chuẩn bị ảnh…");
+  setProgress(0.02, "Đang xử lý ảnh trên thiết bị…");
   try {
     const canvas = drawSourceToCanvas();
-    const result = await window.Tesseract.recognize(canvas, "eng", {
-      logger(message) { if (typeof message.progress === "number") setProgress(message.progress, "Đang đọc từng dòng…"); },
-    });
+    activeOcrLogger = reportOcrProgress;
+    const worker = await getOcrWorker();
+    if (currentScan !== scanSequence) return;
+    setProgress(0.65, "Đang đọc từng dòng…");
+    const result = await withTimeout(
+      worker.recognize(canvas),
+      OCR_TIMEOUT_MS,
+      "OCR mất quá 45 giây. Hãy chụp gần hơn hoặc chọn một ảnh nhỏ hơn.",
+    );
+    if (currentScan !== scanSequence) return;
     const text = (result.data.text || "").trim();
     if (!text) throw new Error("Chưa đọc được chữ. Hãy chụp gần hơn và dùng bút đậm.");
-    elements.codeInput.value = text;
     const confidence = Math.round(result.data.confidence || 0);
+    const quality = assessOcrText(text, confidence);
+    if (!quality.ok) {
+      throw new Error("Ảnh đã được xử lý nhưng chữ chưa đủ rõ. Hãy dùng bút mực đậm trên giấy trắng không kẻ ô và chụp gần phần mã.");
+    }
+    elements.codeInput.value = text;
     elements.confidence.textContent = `OCR ${confidence}%`;
     elements.confidence.hidden = false;
     executeVisibleCode();
     setProgress(1, "Đã nhận dạng xong");
     setTimeout(resetProgress, 900);
   } catch (error) {
+    if (currentScan !== scanSequence) return;
+    await resetOcrWorker();
     resetProgress();
     showToast(error.message || "Không thể nhận dạng ảnh này.");
   } finally {
-    elements.scanButton.disabled = !(mediaStream || uploadedImage);
-    elements.runButton.disabled = false;
+    if (currentScan === scanSequence) {
+      isScanning = false;
+      activeOcrLogger = null;
+      elements.scanButton.disabled = !(mediaStream || uploadedImage);
+      elements.runButton.disabled = false;
+    }
   }
+}
+
+async function cancelRecognition() {
+  if (!isScanning) return;
+  scanSequence += 1;
+  isScanning = false;
+  await resetOcrWorker();
+  resetProgress();
+  elements.scanButton.disabled = !(mediaStream || uploadedImage);
+  elements.runButton.disabled = false;
+  showToast("Đã hủy nhận dạng. Bạn có thể quét lại.");
 }
 
 function loadSelectedImage(file) {
@@ -219,6 +328,7 @@ function registerWebMcp() {
 
 elements.cameraButton.addEventListener("click", startCamera);
 elements.scanButton.addEventListener("click", recognizeAndRun);
+elements.cancelOcrButton.addEventListener("click", cancelRecognition);
 elements.imageInput.addEventListener("change", (event) => loadSelectedImage(event.target.files?.[0]));
 elements.runButton.addEventListener("click", executeVisibleCode);
 elements.clearButton.addEventListener("click", clearWorkspace);
@@ -232,6 +342,7 @@ elements.codeInput.addEventListener("keydown", (event) => {
 });
 window.addEventListener("beforeunload", () => {
   mediaStream?.getTracks().forEach((track) => track.stop());
+  ocrWorker?.terminate();
   if (uploadedImageUrl) URL.revokeObjectURL(uploadedImageUrl);
 });
 
