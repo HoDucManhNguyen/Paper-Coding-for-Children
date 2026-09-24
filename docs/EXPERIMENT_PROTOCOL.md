@@ -62,7 +62,7 @@ Prespecify one primary learning outcome, a power analysis, exclusion rules, hand
 ## Reproducibility checklist
 
 - Public preregistration and versioned protocol.
-- Frozen application commit and OCR model hash.
+- Frozen application commit; model hash when available. For Apple Vision, record macOS version/build and Vision request revision because the model is system supplied.
 - Device, browser, camera, lighting, pen, and paper-template records.
 - Participant-level train/validation/test separation.
 - Blinded ground-truth transcription and adjudication procedure.

@@ -16,7 +16,7 @@
     <a class="skip-link" href="#workspace">Bỏ qua đến vùng làm việc</a>
     <header class="topbar">
       <a class="brand" href="#workspace" aria-label="PaperCode Lab, về vùng làm việc"><span class="brand-mark" aria-hidden="true">P/</span><span>PaperCode <b>Lab</b></span></a>
-      <div class="privacy-pill" title="Ảnh chỉ được xử lý trong trình duyệt"><span aria-hidden="true">●</span> Xử lý tại thiết bị</div>
+      <div class="privacy-pill" title="Ảnh được xử lý trên thiết bị, không gửi dịch vụ đám mây"><span aria-hidden="true">●</span> Xử lý tại thiết bị</div>
     </header>
     <main id="workspace" class="page-shell">
       <section class="intro" aria-labelledby="page-title">
@@ -35,9 +35,15 @@
           <div><span class="step-label">01 / ĐẶT GIẤY VÀO KHUNG</span><span id="camera-status" class="status-text" role="status">Camera chưa bật</span></div>
           <button id="camera-button" class="secondary-button" type="button">Bật camera</button>
         </div>
+        <div class="engine-bar">
+          <label for="engine-select">Bộ đọc</label>
+          <select id="engine-select"><option value="native">Chữ viết tay trên Mac</option><option value="browser">Chữ in trong trình duyệt</option></select>
+          <span id="engine-status" role="status">Đang kiểm tra bộ nhận dạng…</span>
+        </div>
         <div class="stage-grid">
           <div class="camera-panel">
             <video id="camera" playsinline muted aria-label="Hình ảnh trực tiếp từ camera"></video>
+            <img id="source-image" alt="Ảnh giấy đã chọn để nhận dạng" hidden />
             <canvas id="capture-canvas" hidden></canvas>
             <div id="camera-placeholder" class="camera-placeholder"><span class="camera-glyph" aria-hidden="true">⌑</span><strong>Đưa tờ giấy vào đây</strong><span>Giấy trắng · bút mực đậm · máy song song với giấy</span></div>
             <div class="scan-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
@@ -53,26 +59,34 @@
               <span id="confidence-badge" class="confidence-badge" hidden></span>
             </div>
             <label class="sr-only" for="code-input">Mã nhận dạng được, có thể sửa</label>
-            <textarea id="code-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="code-help"></textarea>
+            <textarea id="code-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="code-help" placeholder="Quét giấy hoặc nhập mã ở đây…"></textarea>
             <p id="code-help" class="field-help">Kiểm tra lại chữ máy đọc trước khi chạy.</p>
+            <p id="scan-message" class="scan-message" role="status" hidden></p>
             <div id="line-results" class="line-results" aria-live="polite"></div>
             <div class="result-actions"><button id="run-button" class="primary-button" type="button">Chạy mã</button><button id="clear-button" class="ghost-button" type="button">Làm lại</button></div>
-            <div id="progress-wrap" class="progress-wrap" hidden>
+            <div id="progress-wrap" class="progress-wrap indeterminate" role="status" hidden>
               <div class="progress-copy"><span id="progress-label">Đang chuẩn bị nhận dạng…</span><span id="progress-value">0%</span></div>
               <div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div>
               <button id="cancel-ocr-button" class="cancel-button" type="button">Hủy nhận dạng</button>
             </div>
+            <details id="scan-details" class="scan-details" hidden>
+              <summary>Xem ảnh đã quét và chữ máy đọc</summary>
+              <img id="scan-preview" alt="Đúng vùng ảnh được gửi tới bộ nhận dạng trên máy" />
+              <pre id="raw-transcription"></pre>
+              <p id="normalization-note" class="field-help"></p>
+              <button id="restore-draft" type="button" class="text-button">Khôi phục mã trước lần quét</button>
+            </details>
           </div>
         </div>
       </section>
       <section class="guide-grid" aria-label="Hướng dẫn và giới hạn">
         <article><span class="index">A</span><h2>Cú pháp phiên bản 1</h2><p>Tên biến, số, dấu ngoặc và các phép <code>+ − × ÷ ^</code>. Dùng dấu chấm cho số thập phân.</p></article>
         <article><span class="index">B</span><h2>Khi máy đọc sai</h2><p>Sửa trực tiếp ở ô mã rồi chạy lại. PaperCode không âm thầm đoán hoặc sửa ý của bạn.</p></article>
-        <article><span class="index">C</span><h2>Quyền riêng tư</h2><p>Ảnh và mã không được gửi về máy chủ của PaperCode. Bạn có thể tắt camera bất cứ lúc nào.</p></article>
+        <article><span class="index">C</span><h2>Quyền riêng tư</h2><p>Chữ viết tay được đọc bằng bộ nhận dạng trên máy Mac. Ảnh không được lưu hoặc gửi lên đám mây. Bạn có thể tắt camera bất cứ lúc nào.</p></article>
       </section>
       <details class="research-note"><summary>Vì sao sản phẩm bắt đầu bằng một ngôn ngữ nhỏ?</summary><p>Chữ viết tay của trẻ và ký hiệu lập trình là bài toán khó. Phiên bản này ưu tiên vòng lặp “viết → nhìn lại → sửa → chạy”, giới hạn cú pháp để lỗi dễ nhận biết và đo lường được.</p></details>
     </main>
-    <footer><span>PaperCode Lab v1.0</span><span>Thử nghiệm giáo dục · Không thu thập dữ liệu</span></footer>
+    <footer><span>PaperCode Lab v1.1</span><span>Thử nghiệm giáo dục · Không thu thập dữ liệu</span></footer>
     <div id="toast" class="toast" role="alert" hidden></div>
   </body>
 </html>

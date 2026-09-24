@@ -1,6 +1,6 @@
 # PaperCode Lab
 
-PaperCode Lab is a privacy-first browser prototype that lets a child photograph a short handwritten arithmetic program, inspect the recognized text, and see line-by-line results.
+PaperCode Lab is a local research prototype that lets a child photograph a short handwritten arithmetic program, inspect the recognized text, and see line-by-line results. **Version 1.1 uses Apple Vision on macOS for handwriting.** Static hosting retains a separately labelled printed-text mode only.
 
 ```text
 x = 5
@@ -11,9 +11,11 @@ x + y * z   → 75
 
 ## What works
 
-- Live rear-camera capture on phones and tablets, plus image upload fallback.
-- In-browser OCR with a self-hosted, pinned Tesseract.js worker and language model; images are not sent to a PaperCode server.
-- PaperCode-specific line and glyph segmentation for widely spaced handwritten arithmetic, including documented character-confusion handling such as `O/0`, `I/1`, and open handwritten `3`.
+- Live camera capture and image uploads. Handwriting mode currently runs on the Mac; phone/tablet static previews only offer printed-text OCR.
+- Native macOS handwriting recognition through a loopback-only service; images stay in memory on the Mac.
+- Original and contrast-enhanced readings with spatial row assembly, visible raw text, and a preview of the exact captured region.
+- Camera capture matches the visible scan frame, including cropped portrait/landscape previews.
+- No guessed digits or variable names. The previous `4`→`+`, `5`→`3`, and unknown-glyph substitutions have been removed.
 - A deliberately small language: variables, decimal numbers, parentheses, `+ - * / ^`, and `#` comments.
 - A real tokenizer and recursive-descent interpreter. No `eval`, no dynamic JavaScript execution.
 - Line-by-line results and localized errors beside the recognized code.
@@ -22,13 +24,15 @@ x + y * z   → 75
 
 ## Quick start
 
-The app is static. Serve `dist/` from localhost (camera access requires HTTPS or localhost):
+For handwriting, use macOS 13 or newer, Python 3.10+, and Apple's Swift Command Line Tools. If those tools are missing, install them with `xcode-select --install`. Then run from this repository:
 
 ```bash
-python3 -m http.server 4173 --directory dist
+python3 scripts/serve.py
 ```
 
-Open `http://localhost:4173`, allow camera access, write one statement per line with a dark pen, and select **Quét & chạy**.
+Or use `npm start` if Node.js is installed. First launch compiles the native helper into `.runtime/`; subsequent launches reuse it. Open `http://127.0.0.1:4173`, check that **Chữ viết tay trên Mac** is selected, allow camera access, and select **Quét & chạy**. The sample program is only loaded by the explicit sample button. A failed scan never leaves old sample results looking like a new recognition.
+
+The service listens on 127.0.0.1 only; it is not a public web server. If port 4173 is occupied, stop the old preview or use `python3 scripts/serve.py --port 4174`. Serving only `dist/` with a generic static server does **not** enable handwriting mode.
 
 ## Verify
 
@@ -36,6 +40,7 @@ Requires Node.js 20 or later.
 
 ```bash
 npm test
+npm run test:server
 npm run check
 ```
 
@@ -60,18 +65,21 @@ Identifiers use ASCII letters, digits, and underscores, and must start with a le
 
 ## Research position
 
-This repository is a working research prototype, not evidence of learning effectiveness. Its scope follows evidence that handwriting programming can be acceptable in primary classrooms while recognition errors remain pedagogically consequential. See [docs/RESEARCH.md](docs/RESEARCH.md) and the preregistration-ready [docs/EXPERIMENT_PROTOCOL.md](docs/EXPERIMENT_PROTOCOL.md).
+This repository is a working research prototype, not evidence of learning effectiveness. See [docs/RESEARCH.md](docs/RESEARCH.md), the [experiment protocol](docs/EXPERIMENT_PROTOCOL.md), and [v1.1 OCR validation](docs/OCR_VALIDATION.md), including successful cases and a remaining z/2 failure on faint grid paper. Developer examples are not a held-out accuracy benchmark.
 
 ## Privacy and limitations
 
-OCR runs in the browser. Its open-source runtime and English model are bundled with the app, so scanning does not depend on an OCR CDN. No account, database, analytics, or image upload endpoint is included. Browser extensions and network operators remain outside this repository's control.
+Handwriting images are posted to the same-origin `/api/ocr` endpoint on 127.0.0.1, piped in memory to Apple Vision, and discarded when the process exits. No cloud provider, account, database, analytics, or image storage is used. The server permits one OCR job at a time, limits input to 8 MB, and terminates recognition after 30 seconds. Browser mode uses the bundled Tesseract assets for printed text.
 
-General-purpose OCR can misread children’s handwriting, especially digits and operators. Use a dark ink pen on plain white paper, keep only the code in frame, and always inspect recognized text. Syntactically plausible low-confidence text is shown with a **needs review** badge instead of being discarded; highly noisy text is still rejected. The recognizer corrects only documented glyph confusions and does not repair program meaning. Do not use this prototype for assessment, grading, or high-stakes decisions.
+OCR can still misread handwriting, especially faint strokes and z/2. Conflicting or low-confidence readings are displayed with a review label and provisional arithmetic. Inspect the captured image and raw readings before accepting a result. Normalization is limited to mathematical typography, Cyrillic x/y lookalikes, and single-letter uppercase names to lowercase; each change is recorded. Digits and missing operators are never inferred. Do not use this prototype for assessment, grading, or high-stakes decisions.
 
 ## Repository map
 
 - `dist/` — deployable static application
-- `test/` — interpreter tests
+- `native/` — on-device Apple Vision helper
+- `scripts/serve.py` — local HTTP service and native build launcher
+- `scripts/evaluate-ocr.mjs` — reproducible OCR evaluation against an optional reference
+- `test/` — interpreter, camera mapping, transcription, and service tests
 - `docs/ARCHITECTURE.md` — component and data-flow notes
 - `docs/RESEARCH.md` — evidence basis and product hypotheses
 - `docs/EXPERIMENT_PROTOCOL.md` — staged evaluation protocol

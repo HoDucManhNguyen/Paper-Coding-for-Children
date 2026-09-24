@@ -1,12 +1,14 @@
 {
   "name": "papercode-lab",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Camera-assisted handwritten arithmetic for children",
   "scripts": {
+    "start": "python3 scripts/serve.py",
     "test": "node --test",
-    "check": "node --check dist/assets/core.js && node --check dist/assets/app.js",
+    "check": "node --check dist/assets/core.js && node --check dist/assets/ocr.js && node --check dist/assets/app.js",
+    "test:server": "python3 -m unittest discover -s test -p '*_test.py'",
     "vendor:sync": "node scripts/copy-ocr-assets.mjs"
   },
   "engines": {

@@ -2,3 +2,5 @@
 .sites-runtime/
 node_modules/
 *.log
+.runtime/
+__pycache__/

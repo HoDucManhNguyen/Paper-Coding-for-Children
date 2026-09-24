@@ -17,3 +17,12 @@ jobs:
           node-version: 20
       - run: npm test
       - run: npm run check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm run test:server
+  native:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: swiftc -typecheck native/Recognize.swift

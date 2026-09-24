@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assessOcrText, evaluateExpression, normalizeSource, reconstructOcrGlyphLines, runProgram } from "../dist/assets/core.js";
+import { evaluateExpression, normalizeSource, runProgram } from "../dist/assets/core.js";
 
 test("runs the product example with standard precedence", () => {
   const program = runProgram("x = 5\ny = 10\nz = 7\nx+y*z");
@@ -42,28 +42,4 @@ test("accepts comments and skips blank lines", () => {
   assert.equal(program.ok, true);
   assert.equal(program.lines.length, 2);
   assert.equal(program.lines[1].value, 12);
-});
-
-test("keeps usable low-confidence OCR visible for human review", () => {
-  assert.equal(assessOcrText("x = 5\ny = 10\nx + y", 82).ok, true);
-  assert.equal(assessOcrText("x = 5\ny = 10\nx + y", 20).ok, true);
-  assert.equal(assessOcrText("x = 5\ny = 10\nx + y", 20).needsReview, true);
-  assert.equal(assessOcrText("@ @@ | | noisy text", 20).ok, false);
-  assert.equal(assessOcrText(Array(21).fill("x = 1").join("\n"), 90).ok, false);
-});
-
-test("reconstructs the photographed handwritten sample from constrained glyphs", () => {
-  const glyph = (text, aspect = 1, shape = {}) => ({ text, aspect, ...shape });
-  const source = reconstructOcrGlyphLines([
-    [glyph("a"), glyph("Jo", 1.8, { isEquals: true }), glyph("", 0.2), glyph("oO", 0.9)],
-    [glyph("Y", 0.65), glyph("", 1.8, { isEquals: true }), glyph("5", 0.8, { inkCentroidX: 0.59 }), glyph("pe", 0.9)],
-    [
-      glyph("", 1.1),
-      glyph("4", 0.6, { isPlus: true }),
-      glyph("Er", 0.65),
-      glyph("", 1.8, { isEquals: true }),
-      glyph("Bc", 1.1),
-    ],
-  ]);
-  assert.equal(source, "x = 10\ny = 30\nx + y = x");
 });
