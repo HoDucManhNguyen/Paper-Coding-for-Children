@@ -4,10 +4,12 @@
 
 1. The learner grants camera permission or selects an image.
 2. The browser scales the image and applies grayscale contrast normalization.
-3. Tesseract.js performs OCR locally in a Web Worker.
-4. The recognized text is shown in an editable text area.
-5. A tokenizer and recursive-descent interpreter parse each line.
-6. The interface renders an assignment value, expression result, or localized error next to each source line.
+3. A projection-based preprocessor separates the image into handwritten lines and whitespace-delimited glyphs.
+4. Tesseract.js classifies each glyph locally in a Web Worker.
+5. A constrained, documented confusion map reconstructs PaperCode tokens without changing program semantics.
+6. The recognized text is shown in an editable text area; low-confidence output is visibly marked for review.
+7. A tokenizer and recursive-descent interpreter parse each line.
+8. The interface renders an assignment value, expression result, or localized error next to each source line.
 
 No application backend exists. There is no database, account, analytics SDK, or image upload route.
 

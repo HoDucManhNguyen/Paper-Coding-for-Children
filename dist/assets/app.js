@@ -1,4 +1,4 @@
-import { assessOcrText, runProgram } from "./core.js";
+import { assessOcrText, reconstructOcrGlyphLines, runProgram } from "./core.js";
 
 const SAMPLE = "x = 5\ny = 10\nz = 7\nx + y * z";
 const $ = (selector) => document.querySelector(selector);
@@ -214,6 +214,169 @@ function drawSourceToCanvas() {
   return canvas;
 }
 
+function projectionRanges(values, minimumInk, maximumGap) {
+  const ranges = [];
+  let start = null;
+  let lastInk = null;
+  values.forEach((value, index) => {
+    if (value >= minimumInk) {
+      if (start === null) start = index;
+      lastInk = index;
+    } else if (start !== null && index - lastInk > maximumGap) {
+      ranges.push([start, lastInk]);
+      start = null;
+      lastInk = null;
+    }
+  });
+  if (start !== null) ranges.push([start, lastInk]);
+  return ranges;
+}
+
+function segmentHandwrittenGlyphs(canvas) {
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const { width, height } = canvas;
+  const data = context.getImageData(0, 0, width, height).data;
+  const isInk = (x, y) => data[(y * width + x) * 4] < 170;
+  const left = Math.round(width * 0.05);
+  const right = Math.round(width * 0.95);
+  const top = Math.round(height * 0.05);
+  const bottom = Math.round(height * 0.95);
+  const rowInk = Array(height).fill(0);
+
+  for (let y = top; y < bottom; y += 1) {
+    let count = 0;
+    for (let x = left; x < right; x += 1) if (isInk(x, y)) count += 1;
+    rowInk[y] = count;
+  }
+
+  const lineRanges = projectionRanges(
+    rowInk,
+    Math.max(5, Math.round((right - left) * 0.004)),
+    Math.max(10, Math.round(height * 0.018)),
+  ).filter(([lineTop, lineBottom]) => {
+    const lineHeight = lineBottom - lineTop + 1;
+    return lineHeight >= height * 0.025 && lineHeight <= height * 0.32;
+  });
+
+  const lines = [];
+  for (const [rawTop, rawBottom] of lineRanges.slice(0, 20)) {
+    const lineTop = Math.max(top, rawTop - 4);
+    const lineBottom = Math.min(bottom - 1, rawBottom + 4);
+    const lineHeight = lineBottom - lineTop + 1;
+    const columnInk = Array(width).fill(0);
+    for (let x = left; x < right; x += 1) {
+      let count = 0;
+      for (let y = lineTop; y <= lineBottom; y += 1) if (isInk(x, y)) count += 1;
+      columnInk[x] = count;
+    }
+    const glyphRanges = projectionRanges(
+      columnInk,
+      2,
+      Math.max(7, Math.round(lineHeight * 0.09)),
+    ).filter(([glyphLeft, glyphRight]) => glyphRight - glyphLeft >= 2);
+
+    const glyphs = [];
+    for (const [glyphLeft, glyphRight] of glyphRanges.slice(0, 40)) {
+      let glyphTop = lineBottom;
+      let glyphBottom = lineTop;
+      let inkCount = 0;
+      let inkXTotal = 0;
+      const rowCounts = Array(lineHeight).fill(0);
+      const columnCounts = Array(glyphRight - glyphLeft + 1).fill(0);
+      for (let x = glyphLeft; x <= glyphRight; x += 1) {
+        for (let y = lineTop; y <= lineBottom; y += 1) {
+          if (!isInk(x, y)) continue;
+          glyphTop = Math.min(glyphTop, y);
+          glyphBottom = Math.max(glyphBottom, y);
+          rowCounts[y - lineTop] += 1;
+          columnCounts[x - glyphLeft] += 1;
+          inkCount += 1;
+          inkXTotal += x - glyphLeft;
+        }
+      }
+      if (inkCount < 12 || glyphBottom < glyphTop) continue;
+      const inkWidth = glyphRight - glyphLeft + 1;
+      const inkHeight = glyphBottom - glyphTop + 1;
+      const aspect = inkWidth / inkHeight;
+      const inkCentroidX = inkWidth > 1 ? (inkXTotal / inkCount) / (inkWidth - 1) : 0.5;
+      const rowGroups = projectionRanges(rowCounts, 1, Math.max(2, Math.round(inkHeight * 0.04)));
+      const maxRowInk = Math.max(...rowCounts);
+      const maxColumnInk = Math.max(...columnCounts);
+      const thinRowGroups = rowGroups.length === 2
+        && rowGroups.every(([a, b]) => b - a + 1 < inkHeight * 0.28);
+      const isEquals = thinRowGroups && aspect > 1.15;
+      const isMinus = rowGroups.length === 1 && aspect > 2.2 && inkHeight < lineHeight * 0.48;
+      const isPlus = !isEquals
+        && maxRowInk / inkWidth > 0.62
+        && maxColumnInk / inkHeight > 0.62;
+
+      const padding = Math.max(10, Math.round(Math.max(inkWidth, inkHeight) * 0.16));
+      const cropLeft = Math.max(0, glyphLeft - padding);
+      const cropTop = Math.max(0, glyphTop - padding);
+      const cropWidth = Math.min(width - cropLeft, inkWidth + padding * 2);
+      const cropHeight = Math.min(height - cropTop, inkHeight + padding * 2);
+      const side = Math.max(cropWidth, cropHeight);
+      const glyphCanvas = document.createElement("canvas");
+      glyphCanvas.width = 256;
+      glyphCanvas.height = 256;
+      const glyphContext = glyphCanvas.getContext("2d");
+      glyphContext.fillStyle = "#fff";
+      glyphContext.fillRect(0, 0, 256, 256);
+      const targetWidth = (cropWidth / side) * 216;
+      const targetHeight = (cropHeight / side) * 216;
+      glyphContext.drawImage(
+        canvas,
+        cropLeft,
+        cropTop,
+        cropWidth,
+        cropHeight,
+        (256 - targetWidth) / 2,
+        (256 - targetHeight) / 2,
+        targetWidth,
+        targetHeight,
+      );
+      glyphs.push({ canvas: glyphCanvas, aspect, inkCentroidX, isEquals, isMinus, isPlus });
+    }
+    if (glyphs.length) lines.push(glyphs);
+  }
+  return lines;
+}
+
+async function recognizePaperCode(worker, canvas) {
+  const lines = segmentHandwrittenGlyphs(canvas);
+  const glyphCount = lines.reduce((total, line) => total + line.length, 0);
+  if (!glyphCount || glyphCount > 80) {
+    await worker.setParameters({
+      tessedit_pageseg_mode: "11",
+      tessedit_char_whitelist: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_+-*/^()=.#",
+      preserve_interword_spaces: "1",
+    });
+    const result = await worker.recognize(canvas);
+    return { text: (result.data.text || "").trim(), confidence: Math.round(result.data.confidence || 0) };
+  }
+
+  await worker.setParameters({
+    tessedit_pageseg_mode: "10",
+    tessedit_char_whitelist: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_+-*/^()=.#",
+  });
+  activeOcrLogger = null;
+  let completed = 0;
+  let confidenceTotal = 0;
+  for (const line of lines) {
+    for (const glyph of line) {
+      const result = await worker.recognize(glyph.canvas);
+      glyph.text = (result.data.text || "").trim();
+      confidenceTotal += Number(result.data.confidence || 0);
+      completed += 1;
+      setProgress(0.65 + (completed / glyphCount) * 0.33, `Đang đọc ký tự ${completed}/${glyphCount}…`);
+    }
+  }
+  return {
+    text: reconstructOcrGlyphLines(lines),
+    confidence: Math.round(confidenceTotal / glyphCount),
+  };
+}
+
 async function recognizeAndRun() {
   if (isScanning) return;
   const currentScan = ++scanSequence;
@@ -229,22 +392,24 @@ async function recognizeAndRun() {
     if (currentScan !== scanSequence) return;
     setProgress(0.65, "Đang đọc từng dòng…");
     const result = await withTimeout(
-      worker.recognize(canvas),
+      recognizePaperCode(worker, canvas),
       OCR_TIMEOUT_MS,
       "OCR mất quá 45 giây. Hãy chụp gần hơn hoặc chọn một ảnh nhỏ hơn.",
     );
     if (currentScan !== scanSequence) return;
-    const text = (result.data.text || "").trim();
+    const text = (result.text || "").trim();
     if (!text) throw new Error("Chưa đọc được chữ. Hãy chụp gần hơn và dùng bút đậm.");
-    const confidence = Math.round(result.data.confidence || 0);
+    const confidence = Math.round(result.confidence || 0);
     const quality = assessOcrText(text, confidence);
     if (!quality.ok) {
-      throw new Error("Ảnh đã được xử lý nhưng chữ chưa đủ rõ. Hãy dùng bút mực đậm trên giấy trắng không kẻ ô và chụp gần phần mã.");
+      throw new Error("Ảnh có quá nhiều ký tự lạ để đọc an toàn. Hãy chụp gần phần mã hơn.");
     }
     elements.codeInput.value = text;
-    elements.confidence.textContent = `OCR ${confidence}%`;
+    elements.confidence.textContent = quality.needsReview ? `OCR ${confidence}% · cần kiểm tra` : `OCR ${confidence}%`;
+    elements.confidence.classList.toggle("warning", quality.needsReview);
     elements.confidence.hidden = false;
     executeVisibleCode();
+    if (quality.needsReview) showToast("Đã đọc mã. Hãy kiểm tra lại từng dòng được tô ở bên phải trước khi dùng kết quả.");
     setProgress(1, "Đã nhận dạng xong");
     setTimeout(resetProgress, 900);
   } catch (error) {

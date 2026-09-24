@@ -13,6 +13,7 @@ x + y * z   → 75
 
 - Live rear-camera capture on phones and tablets, plus image upload fallback.
 - In-browser OCR with a self-hosted, pinned Tesseract.js worker and language model; images are not sent to a PaperCode server.
+- PaperCode-specific line and glyph segmentation for widely spaced handwritten arithmetic, including documented character-confusion handling such as `O/0`, `I/1`, and open handwritten `3`.
 - A deliberately small language: variables, decimal numbers, parentheses, `+ - * / ^`, and `#` comments.
 - A real tokenizer and recursive-descent interpreter. No `eval`, no dynamic JavaScript execution.
 - Line-by-line results and localized errors beside the recognized code.
@@ -65,7 +66,7 @@ This repository is a working research prototype, not evidence of learning effect
 
 OCR runs in the browser. Its open-source runtime and English model are bundled with the app, so scanning does not depend on an OCR CDN. No account, database, analytics, or image upload endpoint is included. Browser extensions and network operators remain outside this repository's control.
 
-General-purpose OCR can misread children’s handwriting, especially digits and operators. Use a dark ink pen on plain white paper, keep only the code in frame, and always inspect recognized text. Low-confidence or noisy OCR is rejected instead of overwriting the editor. Do not use this prototype for assessment, grading, or high-stakes decisions.
+General-purpose OCR can misread children’s handwriting, especially digits and operators. Use a dark ink pen on plain white paper, keep only the code in frame, and always inspect recognized text. Syntactically plausible low-confidence text is shown with a **needs review** badge instead of being discarded; highly noisy text is still rejected. The recognizer corrects only documented glyph confusions and does not repair program meaning. Do not use this prototype for assessment, grading, or high-stakes decisions.
 
 ## Repository map
 

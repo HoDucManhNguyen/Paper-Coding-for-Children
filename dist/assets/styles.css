@@ -72,6 +72,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, summary:focus
 .result-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
 .result-heading h2 { margin: 6px 0 18px; font-size: 1.35rem; letter-spacing: -.02em; }
 .confidence-badge { border-radius: 999px; padding: 6px 9px; font-size: .75rem; color: var(--good); background: #d9faf1; font-weight: 800; }
+.confidence-badge.warning { color: #875100; background: #fff0c2; }
 #code-input { width: 100%; min-height: 176px; resize: vertical; border: 1px solid var(--line); border-radius: 12px; padding: 15px 16px; color: var(--ink); background-color: white; background-image: repeating-linear-gradient(transparent 0 31px, #e6ebfa 31px 32px); font: 700 1rem/2 "SFMono-Regular", Consolas, monospace; tab-size: 2; }
 #code-input:focus { border-color: var(--blue); }
 .field-help { margin: 8px 2px 14px; color: var(--muted); font-size: .82rem; }

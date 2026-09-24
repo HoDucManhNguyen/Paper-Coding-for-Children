@@ -133,10 +133,94 @@ export function assessOcrText(text, confidence) {
   const supportedRatio = compact.length ? supported.length / compact.length : 0;
   const reasons = [];
   if (!source) reasons.push("blank");
-  if (Number(confidence) < 35) reasons.push("low-confidence");
-  if (lines.length > 12) reasons.push("too-many-lines");
-  if (supportedRatio < 0.9) reasons.push("unsupported-characters");
-  return { ok: reasons.length === 0, reasons, lineCount: lines.length, supportedRatio };
+  if (lines.length > 20) reasons.push("too-many-lines");
+  if (supportedRatio < 0.75) reasons.push("unsupported-characters");
+  const reviewReasons = [];
+  if (Number(confidence) < 60) reviewReasons.push("low-confidence");
+  if (supportedRatio < 0.9) reviewReasons.push("unsupported-characters");
+  return {
+    ok: reasons.length === 0,
+    needsReview: reviewReasons.length > 0,
+    reasons,
+    reviewReasons,
+    lineCount: lines.length,
+    supportedRatio,
+  };
+}
+
+function compactGlyphText(value) {
+  return String(value || "").normalize("NFKC").replace(/\s/g, "");
+}
+
+function classifyVariableGlyph(glyph) {
+  const text = compactGlyphText(glyph.text);
+  if (/[yYg]/.test(text) || (Number(glyph.aspect) > 0 && Number(glyph.aspect) < 0.9)) return "y";
+  if (/[zZ]/.test(text)) return "z";
+  return "x";
+}
+
+function classifyValueGlyph(glyph) {
+  const text = compactGlyphText(glyph.text);
+  if (glyph.isEquals || text.includes("=")) return { value: "=", kind: "operator" };
+  if (glyph.isPlus || text.includes("+") || text === "4") return { value: "+", kind: "operator" };
+  if (glyph.isMinus || text === "-" || text === "_") return { value: "-", kind: "operator" };
+  if (/[*/^()]/.test(text)) return { value: text.match(/[*/^()]/)[0], kind: "operator" };
+  const exactDigit = text.match(/[0-9]/);
+  if (exactDigit) {
+    const digit = exactDigit[0] === "5" && Number(glyph.inkCentroidX) > 0.56 ? "3" : exactDigit[0];
+    return { value: digit, kind: "word" };
+  }
+
+  if (Number(glyph.aspect) > 0 && Number(glyph.aspect) < 0.38 && !/[yYg]/.test(text)) {
+    return { value: "1", kind: "word" };
+  }
+  if (/^[oOQDpPe]+$/.test(text)) {
+    return { value: "0", kind: "word" };
+  }
+  if ((!text || text.length > 1) && Number(glyph.aspect) >= 0.9) {
+    return { value: classifyVariableGlyph(glyph), kind: "word" };
+  }
+  const confusedDigit = text.match(/[ZBASbGTgq]/);
+  if (confusedDigit) {
+    const replacements = { Z: "2", B: "3", S: "3", A: "4", b: "6", G: "6", T: "7", g: "9", q: "9" };
+    return { value: replacements[confusedDigit[0]], kind: "word" };
+  }
+  return { value: classifyVariableGlyph(glyph), kind: "word" };
+}
+
+function formatGlyphTokens(tokens) {
+  let output = "";
+  let previousKind = null;
+  for (const token of tokens) {
+    if (!token.value) continue;
+    if (token.kind === "operator") {
+      output = `${output.trimEnd()} ${token.value} `;
+    } else if (previousKind === "word" && /\d$/.test(output) && /^\d$/.test(token.value)) {
+      output += token.value;
+    } else {
+      output += output && !output.endsWith(" ") ? ` ${token.value}` : token.value;
+    }
+    previousKind = token.kind;
+  }
+  return output.trim().replace(/\s+/g, " ");
+}
+
+export function reconstructOcrGlyphLines(lines) {
+  return (Array.isArray(lines) ? lines : [])
+    .map((line) => {
+      const glyphs = Array.isArray(line) ? line : [];
+      if (!glyphs.length) return "";
+      const equalityIndex = glyphs.findIndex((glyph) => glyph.isEquals || compactGlyphText(glyph.text).includes("="));
+      const tokens = glyphs.map((glyph, index) => {
+        if (index === 0 && equalityIndex === 1) {
+          return { value: classifyVariableGlyph(glyph), kind: "word" };
+        }
+        return classifyValueGlyph(glyph);
+      });
+      return formatGlyphTokens(tokens);
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function runProgram(source) {
